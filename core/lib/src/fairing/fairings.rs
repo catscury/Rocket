@@ -19,6 +19,7 @@ pub struct Fairings {
     liftoff: Vec<usize>,
     request: Vec<usize>,
     response: Vec<usize>,
+    after_response: Vec<usize>,
 }
 
 macro_rules! iter {
@@ -46,6 +47,7 @@ impl Fairings {
             .chain(self.liftoff.iter())
             .chain(self.request.iter())
             .chain(self.response.iter())
+            .chain(self.after_response.iter())
     }
 
     pub fn add(&mut self, fairing: Box<dyn Fairing>) {
@@ -90,6 +92,7 @@ impl Fairings {
                 remove(i, &mut self.liftoff);
                 remove(i, &mut self.request);
                 remove(i, &mut self.response);
+                remove(i, &mut self.after_response);
             }
         }
 
@@ -99,6 +102,7 @@ impl Fairings {
         if this_info.kind.is(Kind::Liftoff) { self.liftoff.push(index); }
         if this_info.kind.is(Kind::Request) { self.request.push(index); }
         if this_info.kind.is(Kind::Response) { self.response.push(index); }
+        if this_info.kind.is(Kind::AfterResponse) { self.after_response.push(index); }
     }
 
     pub fn append(&mut self, others: &mut Fairings) {
@@ -153,6 +157,13 @@ impl Fairings {
         }
     }
 
+    #[inline(always)]
+    pub async fn handle_after_response<'r>(&self, _req: &'r Request<'_>, st : bool) {
+        for fairing in iter!(self.after_response) {
+            fairing.after_response(_req, st).await;
+        }
+    }
+
     pub fn audit(&self) -> Result<(), &[Info]> {
         match self.failures.is_empty() {
             true => Ok(()),
@@ -184,6 +195,7 @@ impl std::fmt::Debug for Fairings {
             .field("liftoff", &debug_info(iter!(self.liftoff)))
             .field("request", &debug_info(iter!(self.request)))
             .field("response", &debug_info(iter!(self.response)))
+            .field("after_response", &debug_info(iter!(self.after_response)))
             .finish()
     }
 }

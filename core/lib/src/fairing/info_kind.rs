@@ -70,6 +70,10 @@ impl Kind {
     /// [singleton](crate::fairing::Fairing#singletons) fairing.
     pub const Singleton: Kind = Kind(1 << 4);
 
+    /// `Kind` flag representing a
+    /// [singleton](crate::fairing::Fairing#singletons) fairing.
+    pub const AfterResponse: Kind = Kind(1 << 5);
+
     /// Returns `true` if `self` is a superset of `other`. In other words,
     /// returns `true` if all of the kinds in `other` are also in `self`.
     ///
@@ -141,6 +145,7 @@ impl std::fmt::Display for Kind {
         write("liftoff", Kind::Liftoff)?;
         write("request", Kind::Request)?;
         write("response", Kind::Response)?;
-        write("singleton", Kind::Singleton)
+        write("singleton", Kind::Singleton)?;
+        write("after_response", Kind::AfterResponse)
     }
 }

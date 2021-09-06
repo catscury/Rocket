@@ -470,6 +470,14 @@ pub trait Fairing: Send + Sync + Any + 'static {
     ///
     /// The default implementation of this method does nothing.
     async fn on_response<'r>(&self, _req: &'r Request<'_>, _res: &mut Response<'r>) {}
+
+    /// The after_response callback.
+    ///
+    /// This method is called when a response sending will finished
+    /// The default implementation of this method does nothing.
+    /// The `&Request` parameter is the request that was routed,
+    /// and the `bool` parameter is delivery status.
+    async fn after_response<'r>(&self, _req: &'r Request<'_>, st : bool) {}
 }
 
 #[crate::async_trait]
@@ -497,5 +505,10 @@ impl<T: Fairing> Fairing for std::sync::Arc<T> {
     #[inline]
     async fn on_response<'r>(&self, req: &'r Request<'_>, res: &mut Response<'r>) {
         (self as &T).on_response(req, res).await
+    }
+
+    #[inline]
+    async fn after_response<'r>(&self, _req: &'r Request<'_>, _st : bool) {
+        (self as &T).after_response(_req, _st).await
     }
 }

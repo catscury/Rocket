@@ -77,9 +77,10 @@ async fn hyper_service_fn(
             Ok(mut req) => {
                 // Convert into Rocket `Data`, dispatch request, write response.
                 let mut data = Data::from(&mut h_body);
+                let req_clone = req.clone();
                 let token = rocket.preprocess_request(&mut req, &mut data).await;
                 let response = rocket.dispatch(token, &mut req, data).await;
-                rocket.send_response(response, tx).await;
+                rocket.send_response(req_clone, response, tx).await;
             },
             Err(e) => {
                 // TODO: We don't have a request to pass in, so we fabricate
@@ -88,7 +89,7 @@ async fn hyper_service_fn(
                 error!("Bad incoming request: {}", e);
                 let dummy = Request::new(&rocket, Method::Get, Origin::ROOT);
                 let response = rocket.handle_error(Status::BadRequest, &dummy).await;
-                rocket.send_response(response, tx).await;
+                rocket.send_response(dummy.clone(), response, tx).await;
             }
         }
     });
@@ -102,6 +103,7 @@ impl Rocket<Orbit> {
     #[inline]
     async fn send_response(
         &self,
+        request : Request<'_>,
         response: Response<'_>,
         tx: oneshot::Sender<hyper::Response<hyper::Body>>,
     ) {
@@ -112,11 +114,21 @@ impl Rocket<Orbit> {
             _ => false,
         };
 
-        match self._send_response(response, tx).await {
-            Ok(()) => info_!("{}", Paint::green("Response succeeded.")),
-            Err(e) if remote_hungup(&e) => warn_!("Remote left: {}.", e),
-            Err(e) => warn_!("Failed to write response: {}.", e),
-        }
+        let st : bool = match self._send_response(response, tx).await {
+            Ok(()) => {
+                info_!("{}", Paint::green("Response succeeded."));
+                true
+            }
+            Err(e) if remote_hungup(&e) => {
+                warn_!("Remote left: {}.", e);
+                false
+            }
+            Err(e) => {
+                warn_!("Failed to write response: {}.", e);
+                false
+            }
+        };
+        self.fairings.handle_after_response(&request, st).await;
     }
 
     /// Attempts to create a hyper response from `response` and send it to `tx`.
